@@ -31,7 +31,7 @@ Running the binary, we realise that it asks for an input, and outputs whether th
 
 Next, looking at the objdump of the binary, we notice that in the main function, 3 functions (x0, x1 and x2) are being called.
 
-Before moving on, we decided to compare 2 different binaries to see how different they are.
+Before moving on, we decided to compare 2 different binaries to see how different they are. It seems like they are pretty similar, with only 12 instructions different, 4 each in x0, x1 and x2.
 
     $ diff 1.txt 2.txt
     2c2
@@ -75,7 +75,6 @@ Before moving on, we decided to compare 2 different binaries to see how differen
     ---
     >   400756:	b8 f8 16 00 00       	mov    $0x16f8,%eax
 
-It seems like they are pretty similar, with only 12 instructions different, 4 each in x0, x1 and x2 respectively.
 
 Let's take a look at the disassembly of x0.
 
@@ -118,11 +117,11 @@ Let's take a look at the disassembly of x0.
       40065e:	c9                   	leaveq 
       40065f:	c3                   	retq   
 
-Notice that there are some variables being initialised at 4005f1 to 4005f8 (0x8, 0x36 and 0x7). Following that, we have a loop, where each of this is multiplied by the value of each of the 3 characters of our input. The sum is stored and compared with the value at 400642 (0x9eb).
+Making sense of the assembly, we see some variables being initialised at 4005f1, 4005f8, and 4005ff (with values 0x8, 0x36 and 0x7 respectively in this example). Following that, there is a loop, where each of these values is multiplied with the value of each of the 3 characters of our input. The sum is then stored and compared with the value at 400642 (0x9eb in this example).
 
-Looking at the other functions x1 and x2, we notice that the structure is similar, only with differences in the initialisation of variables and the final value being compared with. This also happens to be the difference in our binaries. Conveniently, the addresses were all the same, and so we assumed that the server generates binaries simply by changing the constraints.
+Looking at the other functions x1 and x2, we notice that the structure is similar, only with differences in the initialisation of variables and the final value being compared with. This also happens to be the diff in our objdump found above. Conveniently, the addresses are all the same, and so we assumed that the server generates binaries simply by changing these values.
 
-Now, we craft our final script to solve this challenge.
+Now, we craft our final script to solve this challenge. We use [pwntools](http://pwntools.com/) to handle the connection to the server, some regex to extract the values from the addresses that we found earlier, and [z3](https://github.com/Z3Prover/z3) to find a solution to the constraints.
 
     #!/usr/bin/python
     from pwn import *
@@ -130,8 +129,6 @@ Now, we craft our final script to solve this challenge.
     from subprocess import Popen, PIPE, STDOUT
     import re
     from z3 import *
-
-    s = ''
 
     r = remote('bg1.spro.ink', 4243)
 
@@ -199,19 +196,13 @@ Now, we craft our final script to solve this challenge.
         s.check()
         m = s.model()
 
-        lst = []
-        for x in m:
-            lst.append((str(x), m[x].as_long()))
-
-        t = ''
-
-        for x, y in sorted(lst):
-            t += chr(y)
+        t = chr(m[A].as_long()) + chr(m[B].as_long()) + chr(m[C].as_long())
 
         log.info('Answer: %s' %t)
         r.send(t)
 
     r.interactive()
+
 
 Running the script, we get the flag!
 
